@@ -109,6 +109,14 @@ pub(crate) unsafe fn with_dxgi_swapchain(
     let _ = dxgi_interop.swap_chain.Present(1, 0);
 }
 
+// Detect Intel GPUs.
+// The Intel drivers don't play well with the DXGI interop extension.
+pub(crate) fn is_intel_gpu(gl: &glow::Context) -> bool {
+    let vendor = unsafe { gl.get_parameter_string(GL::VENDOR) };
+    log::debug!("OpenGL Vendor: {}", vendor);
+    vendor.contains("Intel")
+}
+
 // https://github.com/Osspial/render_to_dxgi/blob/master/src/main.rs
 // https://github.com/nlguillemot/OpenGL-on-DXGI/blob/master/main.cpp
 #[allow(non_snake_case)]
@@ -116,6 +124,11 @@ pub(crate) fn create_dxgi_swapchain(
     raw_window_handle: &RawWindowHandle,
     gl: &glow::Context,
 ) -> Result<DXGIInterop, Problem> {
+    if is_intel_gpu(gl) {
+        log::debug!("Intel GPU detected. Disabling DXGI swapchain");
+        return Err(Problem::Unsupported);
+    }
+
     let win32_handle = match raw_window_handle {
         RawWindowHandle::Win32(handle) => handle,
         _ => return Err("Only Win32 handles can be used to create a DXGI swapchain".into()),
