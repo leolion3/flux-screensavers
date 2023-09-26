@@ -120,7 +120,9 @@ pub(crate) fn new_gl_context(
     };
 
     // Make it current.
-    let gl_context = not_current_gl_context.make_current(&gl_surface).unwrap();
+    let gl_context = not_current_gl_context
+        .make_current(&gl_surface)
+        .expect("failed to make the OpenGL context current during setup");
 
     let glow_context = unsafe {
         glow::Context::from_loader_function(|s| {

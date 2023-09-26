@@ -64,20 +64,18 @@ enum Swapchain {
 }
 
 impl Instance {
-    pub fn draw(&mut self, timestamp: f64) {
+    pub fn draw(&mut self, timestamp: f64) -> glutin::error::Result<()> {
         match self.swapchain {
             Swapchain::Gl => {
                 self.gl_context
                     .context
-                    .make_current(&self.gl_context.surface)
-                    .expect("make OpenGL context current");
+                    .make_current(&self.gl_context.surface)?;
 
                 self.flux.animate(timestamp);
 
                 self.gl_context
                     .surface
                     .swap_buffers(&self.gl_context.context)
-                    .expect("swap OpenGL buffers");
             }
 
             #[cfg(windows)]
@@ -85,8 +83,7 @@ impl Instance {
                 platform::windows::dxgi_swapchain::with_dxgi_swapchain(dxgi_interop, |fbo| {
                     self.gl_context
                         .context
-                        .make_current(&self.gl_context.surface)
-                        .expect("make OpenGL context current");
+                        .make_current(&self.gl_context.surface)?;
 
                     self.flux.compute(timestamp);
 
@@ -98,7 +95,9 @@ impl Instance {
 
                     self.gl_context.gl.bind_framebuffer(GL::FRAMEBUFFER, None);
                     self.gl_context.gl.finish();
-                });
+
+                    Ok(())
+                })
             },
         }
     }
@@ -244,7 +243,9 @@ fn run_preview_loop(
         }
 
         let timestamp = start.elapsed().as_secs_f64() * 1000.0;
-        instance.draw(timestamp);
+        if let Err(err) = instance.draw(timestamp) {
+            log::error!("Failed to render Flux: {}", err);
+        }
     }
 
     Ok(())
@@ -284,7 +285,9 @@ fn run_main_loop(
 
         for (_, instance) in instances.iter_mut() {
             let timestamp = start.elapsed().as_secs_f64() * 1000.0;
-            instance.draw(timestamp);
+            if let Err(err) = instance.draw(timestamp) {
+                log::error!("Failed to render Flux: {}", err);
+            }
         }
     }
 

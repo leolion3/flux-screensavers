@@ -88,17 +88,17 @@ pub(crate) struct WGLDXInteropExtensionFunctions {
     pub(crate) DXUnregisterObjectNV: unsafe extern "C" fn(hDevice: HANDLE, hObject: HANDLE) -> BOOL,
 }
 
-pub(crate) unsafe fn with_dxgi_swapchain(
+pub(crate) unsafe fn with_dxgi_swapchain<R>(
     dxgi_interop: &mut DXGIInterop,
-    render: impl FnOnce(&GL::NativeFramebuffer),
-) {
+    render: impl FnOnce(&GL::NativeFramebuffer) -> R,
+) -> R {
     (dxgi_interop.dx_interop.DXLockObjectsNV)(
         dxgi_interop.gl_handle_d3d,
         1,
         &mut dxgi_interop.color_handle_gl as *mut _,
     );
 
-    render(&dxgi_interop.fbo);
+    let result = render(&dxgi_interop.fbo);
 
     (dxgi_interop.dx_interop.DXUnlockObjectsNV)(
         dxgi_interop.gl_handle_d3d,
@@ -107,6 +107,8 @@ pub(crate) unsafe fn with_dxgi_swapchain(
     );
 
     let _ = dxgi_interop.swap_chain.Present(1, 0);
+
+    result
 }
 
 // Detect Intel GPUs.
