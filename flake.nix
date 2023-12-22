@@ -89,6 +89,7 @@
 
           packages = with pkgs.pkgsBuildHost; [
             rustToolchain
+            cargo-outdated
             fontconfig
             cmake
             alejandra
