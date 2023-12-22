@@ -25,7 +25,7 @@ strip = true # Remove debug symbols
 
 [dependencies]
 directories = "5"
-glow = "0.12.2"
+glow = "0.12"
 log = { version = "0.4", features = ["serde"] }
 log-panics = { version = "2", features = ["with-backtrace"]}
 raw-window-handle = "0.5"
@@ -35,25 +35,26 @@ serde_json = "1"
 simplelog = "^0.12.0"
 
 [dependencies.winit]
-version = "0.28.3"
+version = "0.29"
 git = "https://github.com/sandydoo/winit"
 branch = "flux"
 default-features = false
 
 [dependencies.sdl2]
-version = "0.35.2"
+version = "0.36"
 default-features = false
 features = [ "static-link", "raw-window-handle" ]
 
 [dependencies.sdl2-sys]
-version = "0.35.2"
+version = "0.36"
 features = [ "static-link" ]
 
 [dependencies.glutin]
-version = "0.30.6"
+version = "0.31"
 default-features = false
 features = ["egl", "wgl"]
 
+# >=v0.10 drops iced_glow
 [dependencies.iced]
 version = "0.9"
 default-features = false
@@ -71,7 +72,7 @@ git = "https://github.com/sandydoo/flux"
 branch = "main"
 
 [target.'cfg(windows)'.dependencies.windows]
-version =  "^0.48.0"
+version =  "^0.52.0"
 features = [
   "Win32_Foundation",
   "Win32_Graphics_Direct3D",
@@ -93,8 +94,6 @@ features = [
 winres = "0.1.12"
 
 [patch.crates-io]
-sdl2 = { git = "https://github.com/Rust-SDL2/rust-sdl2", branch = "master" }
-sdl2-sys = { git = "https://github.com/Rust-SDL2/rust-sdl2", branch = "master" }
 winres = { git = "https://github.com/sandydoo/winres", branch = "bugfix/fix-linking" }
 
 # [patch."https://github.com/sandydoo/flux"]

@@ -20,7 +20,7 @@ use std::{fs, path, process, rc::Rc};
 
 use glow as GL;
 use glow::HasContext;
-use glutin::context::PossiblyCurrentContextGlSurfaceAccessor;
+use glutin::context::PossiblyCurrentGlContext;
 use glutin::prelude::GlSurface;
 
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawWindowHandle};
@@ -312,7 +312,7 @@ fn new_preview_window(
 
     let mut rect = RECT::default();
     unsafe {
-        GetClientRect(preview_hwnd, &mut rect);
+        let _ = GetClientRect(preview_hwnd, &mut rect);
     }
 
     let inner_size = PhysicalSize::new(rect.right as u32, rect.bottom as u32);

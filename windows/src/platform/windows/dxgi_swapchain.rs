@@ -248,10 +248,7 @@ pub(crate) fn create_dxgi_swapchain(
 
         // Clear the back buffer
         let clear_color: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
-        context.ClearRenderTargetView(
-            color_buffer_view.as_ref().unwrap(),
-            &clear_color as *const _,
-        );
+        context.ClearRenderTargetView(color_buffer_view.as_ref().unwrap(), &clear_color);
         log::debug!("Cleared render target view");
 
         // Register the D3D11 device with GL
