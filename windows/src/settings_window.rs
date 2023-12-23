@@ -83,7 +83,7 @@ impl Application for Config {
             text("Fill mode").size(20.0),
             "Configures how Flux works across multiple monitors.",
             "None: Each monitor is a separate surface.",
-            "Extend: Combines any matching adjacent monitors.",
+            "Span: Combines any matching adjacent monitors.",
             "Fill: Combines all monitors into a single seamless surface.",
             fill_list,
         ]

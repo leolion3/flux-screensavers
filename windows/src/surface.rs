@@ -89,7 +89,7 @@ pub fn build(
     use config::FillMode;
     match fill_mode {
         FillMode::None => surfaces,
-        FillMode::Extend => extend(surfaces),
+        FillMode::Span => extend(surfaces),
         FillMode::Fill => fill(surfaces),
     }
 }

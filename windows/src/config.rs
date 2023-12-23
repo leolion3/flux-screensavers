@@ -180,15 +180,15 @@ pub struct WindowsConfig {
 pub enum FillMode {
     // Display a separate instance on each display
     None,
-    // Extend across and up to displays with matching dimensions
+    // Span across and up to displays with matching dimensions
     #[default]
-    Extend,
+    Span,
     // Fill all displays with a single surface
     Fill,
 }
 
 impl FillMode {
-    pub const ALL: [FillMode; 3] = [FillMode::None, FillMode::Extend, FillMode::Fill];
+    pub const ALL: [FillMode; 3] = [FillMode::None, FillMode::Span, FillMode::Fill];
 }
 
 impl fmt::Display for FillMode {
@@ -198,7 +198,7 @@ impl fmt::Display for FillMode {
             "{}",
             match self {
                 FillMode::None => "None",
-                FillMode::Extend => "Extend",
+                FillMode::Span => "Span",
                 FillMode::Fill => "Fill",
             }
         )
