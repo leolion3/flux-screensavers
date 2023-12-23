@@ -1,20 +1,47 @@
-use std::{path::PathBuf, ptr};
+use std::{
+    ffi::OsString,
+    os::windows::prelude::OsStringExt,
+    path::{Path, PathBuf},
+    ptr,
+};
 use windows::{core::*, Win32::System::Com::*, Win32::UI::Shell::*};
 use winit::monitor::MonitorHandle;
 use winit::platform::windows::MonitorHandleExtWindows;
 
-pub fn get(monitor: &MonitorHandle) -> Result<PathBuf> {
-    unsafe {
+pub struct DesktopWallpaper {
+    interface: IDesktopWallpaper,
+}
+
+impl DesktopWallpaper {
+    pub fn new() -> Result<Self> {
         com_initialized();
 
-        let desktop: IDesktopWallpaper = CoCreateInstance(&DesktopWallpaper, None, CLSCTX_ALL)?;
+        let interface: IDesktopWallpaper =
+            unsafe { CoCreateInstance(&DesktopWallpaper, None, CLSCTX_ALL)? };
 
-        let wallpaper: PWSTR = desktop.GetWallpaper(&HSTRING::from(monitor.native_id()))?;
+        Ok(Self { interface })
+    }
 
-        // TODO; check that the path is valid (file exists)
+    pub fn get(&self, index: u32) -> std::result::Result<PathBuf, String> {
+        let monitor_id = unsafe {
+            self.interface
+                .GetMonitorDevicePathAt(index)
+                .and_then(|mid| mid.to_hstring())
+                .map_err(|e| e.to_string())?
+        };
 
-        let path = wallpaper.to_string().unwrap();
-        Ok(PathBuf::from(path))
+        let wallpaper = unsafe {
+            self.interface
+                .GetWallpaper(&monitor_id)
+                .map_err(|e| e.to_string())?
+        };
+
+        let wallpaper_string = unsafe { OsString::from_wide(wallpaper.as_wide()) };
+        let path = Path::new(&wallpaper_string);
+
+        (path.exists() && path.is_file())
+            .then_some(path.to_path_buf())
+            .ok_or("Failed to get wallpaper".to_string())
     }
 }
 

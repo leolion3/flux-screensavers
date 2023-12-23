@@ -187,9 +187,18 @@ fn run_flux(mode: Mode, config: Config) -> Result<(), String> {
         }
 
         Mode::Screensaver => {
+            let wallpaper_api = wallpaper::DesktopWallpaper::new().ok();
             let monitors = video_subsystem
                 .available_monitors()
-                .map(|monitor| (monitor.clone(), wallpaper::get(&monitor).ok()))
+                .enumerate()
+                .map(|(index, monitor)| {
+                    (
+                        monitor.clone(),
+                        wallpaper_api
+                            .as_ref()
+                            .and_then(|wallpaper| wallpaper.get(index as u32).ok()),
+                    )
+                })
                 .collect::<Vec<(MonitorHandle, Option<std::path::PathBuf>)>>();
             log::debug!("Available monitors: {:?}", monitors);
 
@@ -352,9 +361,18 @@ fn new_preview_window(
 
     let swapchain = create_swapchain(&raw_window_handle, &gl_context);
 
-    let wallpaper = window
-        .current_monitor()
-        .and_then(|monitor| wallpaper::get(&monitor).ok());
+    let some_current_monitor = window.current_monitor();
+    let current_monitor_index = some_current_monitor
+        .and_then(|current_monitor| {
+            video_subsystem
+                .available_monitors()
+                .position(|monitor| monitor == current_monitor)
+                .map(|index| index as u32)
+        })
+        .unwrap_or(0);
+    let wallpaper = wallpaper::DesktopWallpaper::new()
+        .ok()
+        .and_then(|wallpaper| wallpaper.get(current_monitor_index).ok());
 
     let physical_size = window.inner_size();
     let scale_factor = window.scale_factor();
