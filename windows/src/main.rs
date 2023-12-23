@@ -202,7 +202,8 @@ fn run_flux(mode: Mode, config: Config) -> Result<(), String> {
                 .collect::<Vec<(MonitorHandle, Option<std::path::PathBuf>)>>();
             log::debug!("Available monitors: {:?}", monitors);
 
-            let surfaces = surface::combine_monitors(&monitors);
+            let fill_mode = config.platform.windows.fill_mode;
+            let surfaces = surface::build(&monitors, fill_mode);
             log::debug!("Creating windows: {:?}", surfaces);
 
             let mut instances = surfaces

@@ -1,7 +1,10 @@
+use std::collections::HashMap;
 use std::path;
 
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::monitor::MonitorHandle;
+
+use crate::config;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Surface {
@@ -46,44 +49,42 @@ impl Surface {
     }
 }
 
-pub fn combine_monitors(monitors: &[(MonitorHandle, Option<path::PathBuf>)]) -> Vec<Surface> {
+pub fn build(
+    monitors: &[(MonitorHandle, Option<path::PathBuf>)],
+    fill_mode: config::FillMode,
+) -> Vec<Surface> {
     let surfaces = monitors
         .iter()
         .map(|(handle, wallpaper)| Surface::from_monitor(handle, wallpaper))
         .collect();
 
-    SurfaceGroup::new().add(surfaces).combine()
-}
+    use config::FillMode;
+    match fill_mode {
+        FillMode::None => surfaces,
+        FillMode::Extend => {
+            let mut grouping: HashMap<PhysicalSize<u32>, Surface> = HashMap::new();
 
-use std::collections::HashMap;
-struct SurfaceGroup {
-    grouping: HashMap<PhysicalSize<u32>, Surface>,
-    surfaces: Vec<Surface>,
-}
+            for surface in surfaces.into_iter() {
+                grouping
+                    .entry(surface.size)
+                    .and_modify(|existing_surface| existing_surface.merge(&surface))
+                    .or_insert_with(|| surface);
+            }
 
-impl SurfaceGroup {
-    fn new() -> Self {
-        Self {
-            grouping: HashMap::new(),
-            surfaces: Vec::new(),
+            grouping.into_values().collect::<Vec<Surface>>()
         }
-    }
-
-    fn add(mut self, surfaces: Vec<Surface>) -> Self {
-        self.surfaces = surfaces;
-
-        self
-    }
-
-    fn combine(mut self) -> Vec<Surface> {
-        for surface in self.surfaces.iter() {
-            self.grouping
-                .entry(surface.size)
-                .and_modify(|existing_surface| existing_surface.merge(surface))
-                .or_insert_with(|| surface.clone());
+        FillMode::Fill => {
+            let optional_surface = surfaces.into_iter().reduce(|mut a, b| {
+                a.merge(&b);
+                a
+            });
+            // Return a vec of one surface or an empty vec.
+            if let Some(surface) = optional_surface {
+                vec![surface]
+            } else {
+                vec![]
+            }
         }
-
-        self.grouping.into_values().collect::<Vec<Surface>>()
     }
 }
 

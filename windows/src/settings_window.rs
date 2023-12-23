@@ -1,4 +1,4 @@
-use crate::config::{ColorMode, Config};
+use crate::config::{ColorMode, Config, FillMode};
 
 use iced::executor;
 use iced::widget::{button, column, container, pick_list, text};
@@ -9,7 +9,7 @@ pub fn run(config: Config) -> iced::Result {
     Config::run(iced::Settings {
         flags: config,
         window: iced::window::Settings {
-            size: (250, 250),
+            size: (500, 500),
             resizable: false,
             decorations: true,
             ..Default::default()
@@ -21,6 +21,7 @@ pub fn run(config: Config) -> iced::Result {
 #[derive(Debug, Clone, Copy)]
 pub enum Message {
     SetColorMode(ColorMode),
+    SetFillMode(FillMode),
     Save,
 }
 
@@ -45,6 +46,11 @@ impl Application for Config {
                 Command::none()
             }
 
+            Message::SetFillMode(new_fill_mode) => {
+                self.platform.windows.fill_mode = new_fill_mode;
+                Command::none()
+            }
+
             Message::Save => {
                 self.save().unwrap_or_else(|err| log::error!("{}", err));
                 window::close()
@@ -53,16 +59,22 @@ impl Application for Config {
     }
 
     fn view(&self) -> Element<Message> {
-        let pick_list = pick_list(
+        let color_list = pick_list(
             &ColorMode::ALL[..],
             Some(self.flux.color_mode),
             Message::SetColorMode,
         )
         .placeholder("Choose a color theme");
 
+        let fill_list = pick_list(
+            &FillMode::ALL[..],
+            Some(self.platform.windows.fill_mode),
+            Message::SetFillMode,
+        );
+
         let save_button = button(text("Save")).on_press(Message::Save);
 
-        let content = column!["Colors", pick_list, save_button]
+        let content = column!["Colors", color_list, "Fill mode", fill_list, save_button]
             .height(Length::Fill)
             .align_items(Alignment::Center)
             .spacing(10);

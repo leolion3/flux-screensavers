@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::{fmt, fs, io, path};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[serde(default)]
 pub struct Config {
     pub version: semver::Version,
     pub log_level: log::Level,
     pub flux: FluxSettings,
+    pub platform: PlatformConfig,
 
     // An optional path to the location of this config
     #[serde(skip)]
@@ -19,6 +21,7 @@ impl Default for Config {
             version: semver::Version::parse("0.1.0").unwrap(),
             log_level: log::Level::Warn,
             flux: Default::default(),
+            platform: Default::default(),
             location: None,
         }
     }
@@ -153,6 +156,50 @@ impl std::fmt::Display for ColorMode {
                     }
                 }
                 ColorMode::DesktopImage => "Use desktop wallpaper",
+            }
+        )
+    }
+}
+
+#[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
+#[serde(default)]
+// Platform-specific configuration
+pub struct PlatformConfig {
+    #[cfg(windows)]
+    pub windows: WindowsConfig,
+}
+
+#[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
+#[serde(default)]
+// Windows-specific configuration
+pub struct WindowsConfig {
+    pub fill_mode: FillMode,
+}
+
+#[derive(Default, Deserialize, Serialize, Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FillMode {
+    // Display a separate instance on each display
+    None,
+    // Extend across and up to displays with matching dimensions
+    #[default]
+    Extend,
+    // Fill all displays with a single surface
+    Fill,
+}
+
+impl FillMode {
+    pub const ALL: [FillMode; 3] = [FillMode::None, FillMode::Extend, FillMode::Fill];
+}
+
+impl fmt::Display for FillMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                FillMode::None => "None",
+                FillMode::Extend => "Extend",
+                FillMode::Fill => "Fill",
             }
         )
     }
