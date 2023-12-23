@@ -49,62 +49,101 @@ impl Surface {
     }
 }
 
+fn from_monitors(monitors: &[(MonitorHandle, Option<path::PathBuf>)]) -> Vec<Surface> {
+    monitors
+        .iter()
+        .map(|(monitor, wallpaper)| Surface::from_monitor(monitor, wallpaper))
+        .collect()
+}
+
+fn extend(surfaces: Vec<Surface>) -> Vec<Surface> {
+    let mut grouping: HashMap<PhysicalSize<u32>, Surface> = HashMap::new();
+    for surface in surfaces.into_iter() {
+        grouping
+            .entry(surface.size)
+            .and_modify(|existing_surface| existing_surface.merge(&surface))
+            .or_insert_with(|| surface);
+    }
+    grouping.into_values().collect::<Vec<Surface>>()
+}
+
+fn fill(surfaces: Vec<Surface>) -> Vec<Surface> {
+    let optional_surface = surfaces.into_iter().reduce(|mut a, b| {
+        a.merge(&b);
+        a
+    });
+    // Return a vec of one surface or an empty vec.
+    if let Some(surface) = optional_surface {
+        vec![surface]
+    } else {
+        vec![]
+    }
+}
+
 pub fn build(
     monitors: &[(MonitorHandle, Option<path::PathBuf>)],
     fill_mode: config::FillMode,
 ) -> Vec<Surface> {
-    let surfaces = monitors
-        .iter()
-        .map(|(handle, wallpaper)| Surface::from_monitor(handle, wallpaper))
-        .collect();
+    let surfaces = from_monitors(monitors);
 
     use config::FillMode;
     match fill_mode {
         FillMode::None => surfaces,
-        FillMode::Extend => {
-            let mut grouping: HashMap<PhysicalSize<u32>, Surface> = HashMap::new();
-
-            for surface in surfaces.into_iter() {
-                grouping
-                    .entry(surface.size)
-                    .and_modify(|existing_surface| existing_surface.merge(&surface))
-                    .or_insert_with(|| surface);
-            }
-
-            grouping.into_values().collect::<Vec<Surface>>()
-        }
-        FillMode::Fill => {
-            let optional_surface = surfaces.into_iter().reduce(|mut a, b| {
-                a.merge(&b);
-                a
-            });
-            // Return a vec of one surface or an empty vec.
-            if let Some(surface) = optional_surface {
-                vec![surface]
-            } else {
-                vec![]
-            }
-        }
+        FillMode::Extend => extend(surfaces),
+        FillMode::Fill => fill(surfaces),
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-//
-//     #[test]
-//     fn it_does_not_combine_two_different_displays() {
-//         let display0 = Surface::from_bounds(Rect::new(0, 0, 3360, 2100), BASE_DPI as f64);
-//         let display1 = Surface::from_bounds(
-//             Rect::new(display0.bounds.width() as i32, 0, 2560, 1440),
-//             BASE_DPI as f64,
-//         );
-//
-//         assert_eq!(
-//             Surface::combine_displays(&[display0, display1]),
-//             vec![display0, display1]
-//         );
-//     }
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn it_does_not_extend_two_different_displays() {
+        let display0 = Surface {
+            position: (0, 0).into(),
+            size: (3360, 2100).into(),
+            scale_factor: 1.0,
+            wallpaper: None,
+        };
+        let display1 = Surface {
+            position: (3360, 0).into(),
+            size: (2560, 1440).into(),
+            scale_factor: 1.0,
+            wallpaper: None,
+        };
+
+        assert_eq!(
+            extend(vec![display0.clone(), display1.clone()]),
+            vec![display0, display1]
+        );
+    }
+
+    #[test]
+    fn it_fills_all_displays() {
+        let display0 = Surface {
+            position: (-500, 0).into(),
+            size: (1920, 1080).into(),
+            scale_factor: 1.0,
+            wallpaper: None,
+        };
+        let display1 = Surface {
+            position: (1420, 0).into(),
+            size: (2560, 1440).into(),
+            scale_factor: 1.0,
+            wallpaper: None,
+        };
+        assert_eq!(
+            fill(vec![display0, display1]),
+            vec![Surface {
+                position: (-500, 0).into(),
+                size: (3980, 1440).into(),
+                scale_factor: 1.0,
+                wallpaper: None,
+            }]
+        );
+    }
+}
 //
 //     #[test]
 //     fn it_partially_combines_two_1440p_displays_and_a_separate_laptop_display() {
