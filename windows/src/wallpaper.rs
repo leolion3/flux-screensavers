@@ -1,9 +1,4 @@
-use std::{
-    ffi::OsString,
-    os::windows::prelude::OsStringExt,
-    path::{Path, PathBuf},
-    ptr,
-};
+use std::{ffi::OsString, os::windows::prelude::OsStringExt, path::PathBuf, ptr};
 use windows::{core::*, Win32::System::Com::*, Win32::UI::Shell::*};
 
 pub struct DesktopWallpaper {
@@ -35,10 +30,10 @@ impl DesktopWallpaper {
         };
 
         let wallpaper_string = unsafe { OsString::from_wide(wallpaper.as_wide()) };
-        let path = Path::new(&wallpaper_string);
+        let path = PathBuf::from(&wallpaper_string);
 
         (path.exists() && path.is_file())
-            .then_some(path.to_path_buf())
+            .then_some(path)
             .ok_or("Failed to get wallpaper".to_string())
     }
 }
