@@ -5,8 +5,6 @@ use std::{
     ptr,
 };
 use windows::{core::*, Win32::System::Com::*, Win32::UI::Shell::*};
-use winit::monitor::MonitorHandle;
-use winit::platform::windows::MonitorHandleExtWindows;
 
 pub struct DesktopWallpaper {
     interface: IDesktopWallpaper,
