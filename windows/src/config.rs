@@ -101,6 +101,10 @@ impl Config {
 
         let color_mode = match &self.flux.color_mode {
             ColorMode::Preset(preset) => settings::ColorMode::Preset(*preset),
+            ColorMode::ImageFile => self.flux.image_path.clone().map_or(
+                settings::ColorMode::default(),
+                settings::ColorMode::ImageFile,
+            ),
             ColorMode::DesktopImage => wallpaper.map_or(
                 settings::ColorMode::default(),
                 settings::ColorMode::ImageFile,
@@ -116,11 +120,13 @@ impl Config {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct FluxSettings {
     pub color_mode: ColorMode,
+    pub image_path: Option<path::PathBuf>,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum ColorMode {
     Preset(flux::settings::ColorPreset),
+    ImageFile,
     DesktopImage,
 }
 
@@ -132,11 +138,12 @@ impl Default for ColorMode {
 
 use flux::settings::ColorPreset;
 impl ColorMode {
-    pub const ALL: [ColorMode; 4] = [
+    pub const ALL: [ColorMode; 5] = [
         ColorMode::Preset(ColorPreset::Original),
         ColorMode::Preset(ColorPreset::Plasma),
         ColorMode::Preset(ColorPreset::Poolside),
         ColorMode::DesktopImage,
+        ColorMode::ImageFile,
     ];
 }
 
@@ -156,6 +163,7 @@ impl std::fmt::Display for ColorMode {
                     }
                 }
                 ColorMode::DesktopImage => "From wallpaper",
+                ColorMode::ImageFile => "From image",
             }
         )
     }
@@ -177,10 +185,11 @@ pub struct WindowsConfig {
 }
 
 #[derive(Default, Deserialize, Serialize, Copy, Clone, Debug, Eq, PartialEq)]
+// Configures how Flux works with multiple displays.
 pub enum FillMode {
     // Display a separate instance on each display
     None,
-    // Span across and up to displays with matching dimensions
+    // Span across and up to adjacent displays with matching dimensions
     #[default]
     Span,
     // Fill all displays with a single surface

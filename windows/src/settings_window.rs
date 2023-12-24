@@ -1,19 +1,22 @@
 use crate::config::{ColorMode, Config, FillMode};
 
+use async_std::task;
 use indoc::indoc;
+use std::path::PathBuf;
+use tinyfiledialogs::open_file_dialog;
 
-use iced::alignment::Horizontal;
+use iced::alignment::{Alignment, Horizontal};
 use iced::executor;
 use iced::theme;
-use iced::widget::{button, column, container, pick_list, row, text, vertical_space};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text};
 use iced::window;
-use iced::{Application, Command, Element, Length, Padding, Theme};
+use iced::{Application, Command, Element, Length, Theme};
 
 pub fn run(config: Config) -> iced::Result {
     Config::run(iced::Settings {
         flags: config,
         window: iced::window::Settings {
-            size: (500, 500),
+            size: (420, 520),
             resizable: false,
             decorations: true,
             ..Default::default()
@@ -23,10 +26,12 @@ pub fn run(config: Config) -> iced::Result {
     })
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Message {
     SetColorMode(ColorMode),
     SetFillMode(FillMode),
+    OpenFilePicker,
+    SetImageFile(Option<String>),
     Save,
     Cancel,
 }
@@ -57,6 +62,26 @@ impl Application for Config {
                 Command::none()
             }
 
+            Message::OpenFilePicker => Command::perform(
+                task::spawn_blocking(|| {
+                    open_file_dialog(
+                        "Select an image",
+                        "",
+                        Some((&["*.jpg", "*.jpeg", "*.png"], "Images")),
+                    )
+                }),
+                Message::SetImageFile,
+            ),
+
+            Message::SetImageFile(some_path) => {
+                if let Some(path_string) = some_path {
+                    let path = PathBuf::from(path_string);
+                    self.flux.color_mode = ColorMode::ImageFile;
+                    self.flux.image_path = Some(path);
+                }
+                Command::none()
+            }
+
             Message::Save => {
                 self.save().unwrap_or_else(|err| log::error!("{}", err));
                 window::close()
@@ -74,12 +99,27 @@ impl Application for Config {
         )
         .padding(8);
 
-        let color_section = column![
+        let mut color_section = column![
             text("Colors").size(20.0),
-            "Choose from a selection of presets or use your desktop wallpaper.",
+            "Choose from a selection of presets or use an image.",
             color_list
         ]
         .spacing(12);
+
+        if self.flux.color_mode == ColorMode::ImageFile {
+            let mut image_picker = row![]
+                .push(
+                    button("Select image")
+                        .padding(8)
+                        .on_press(Message::OpenFilePicker),
+                )
+                .align_items(Alignment::Center)
+                .spacing(12);
+            if let Some(image_path) = &self.flux.image_path {
+                image_picker = image_picker.push(text(image_path.display()));
+            }
+            color_section = color_section.push(image_picker);
+        }
 
         let fill_list = pick_list(
             &FillMode::ALL[..],
@@ -111,21 +151,15 @@ impl Application for Config {
             .on_press(Message::Cancel);
         let button_row = container(row![save_button, cancel_button].spacing(12));
 
-        let content = column![
-            color_section,
-            fill_section,
-            vertical_space(Length::Fill),
-            button_row
-        ]
-        .height(Length::Fill)
-        .spacing(36);
+        let content = column![color_section, fill_section, button_row]
+            .height(Length::Fill)
+            .width(Length::Fill)
+            .spacing(36)
+            .padding(36);
 
         container(content)
             .width(Length::Fill)
             .height(Length::Fill)
-            .center_x()
-            .center_y()
-            .padding(24)
             .into()
     }
 
