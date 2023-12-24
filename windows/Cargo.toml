@@ -26,6 +26,7 @@ strip = true # Remove debug symbols
 [dependencies]
 directories = "5"
 glow = "0.12"
+indoc = "2"
 log = { version = "0.4", features = ["serde"] }
 log-panics = { version = "2", features = ["with-backtrace"]}
 raw-window-handle = "0.5"

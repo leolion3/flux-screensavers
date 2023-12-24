@@ -155,7 +155,7 @@ impl std::fmt::Display for ColorMode {
                         Freedom => "Freedom",
                     }
                 }
-                ColorMode::DesktopImage => "Use desktop wallpaper",
+                ColorMode::DesktopImage => "From wallpaper",
             }
         )
     }

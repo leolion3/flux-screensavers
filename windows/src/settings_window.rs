@@ -1,10 +1,13 @@
 use crate::config::{ColorMode, Config, FillMode};
 
+use indoc::indoc;
+
+use iced::alignment::Horizontal;
 use iced::executor;
 use iced::theme;
-use iced::widget::{button, column, container, pick_list, row, text};
+use iced::widget::{button, column, container, pick_list, row, text, vertical_space};
 use iced::window;
-use iced::{Alignment, Application, Command, Element, Length, Theme};
+use iced::{Application, Command, Element, Length, Padding, Theme};
 
 pub fn run(config: Config) -> iced::Result {
     Config::run(iced::Settings {
@@ -69,39 +72,53 @@ impl Application for Config {
             Some(self.flux.color_mode),
             Message::SetColorMode,
         )
-        .padding(4);
+        .padding(8);
 
-        let color_section = column![text("Colors").size(20.0), color_list].spacing(12);
+        let color_section = column![
+            text("Colors").size(20.0),
+            "Choose from a selection of presets or use your desktop wallpaper.",
+            color_list
+        ]
+        .spacing(12);
 
         let fill_list = pick_list(
             &FillMode::ALL[..],
             Some(self.platform.windows.fill_mode),
             Message::SetFillMode,
-        );
+        )
+        .padding(8);
 
         let fill_section = column![
             text("Fill mode").size(20.0),
-            "Configures how Flux works across multiple monitors.",
-            "None: Each monitor is a separate surface.",
-            "Span: Combines any matching adjacent monitors.",
-            "Fill: Combines all monitors into a single seamless surface.",
+            "Configure how Flux works across multiple monitors.",
+            indoc! {"
+                None: Each monitor is a separate surface.
+                Span: Combines any matching adjacent monitors.
+                Fill: Combines all monitors into a single seamless surface.
+            "},
             fill_list,
         ]
         .spacing(12);
 
-        let save_button = button("Save").padding(4).on_press(Message::Save);
-        let cancel_button = button("Cancel")
+        let save_button = button(text("Save").horizontal_alignment(Horizontal::Center))
+            .padding(8)
+            .width(Length::Fixed(96.0))
+            .on_press(Message::Save);
+        let cancel_button = button(text("Cancel").horizontal_alignment(Horizontal::Center))
             .style(theme::Button::Secondary)
-            .padding(4)
+            .padding(8)
+            .width(Length::Fixed(96.0))
             .on_press(Message::Cancel);
-        let button_row = row![save_button, cancel_button]
-            .spacing(12)
-            .align_items(Alignment::End);
+        let button_row = container(row![save_button, cancel_button].spacing(12));
 
-        let content = column![color_section, fill_section, button_row]
-            .height(Length::Fill)
-            // .align_items(Alignment::Center)
-            .spacing(24);
+        let content = column![
+            color_section,
+            fill_section,
+            vertical_space(Length::Fill),
+            button_row
+        ]
+        .height(Length::Fill)
+        .spacing(36);
 
         container(content)
             .width(Length::Fill)
