@@ -7,29 +7,35 @@ mod gl_context;
 mod platform;
 mod settings_window;
 mod surface;
+#[cfg(windows)]
 mod wallpaper;
 mod winit_compat;
 
 use cli::Mode;
 use config::Config;
 use flux::Flux;
-use winit_compat::{HasMonitors, HasWinitWindow, MonitorHandle};
+use winit_compat::{HasMonitors, MonitorHandle};
 
 use std::collections::HashMap;
 use std::{fs, path, process, rc::Rc};
 
-use glow as GL;
-use glow::HasContext;
 use glutin::context::PossiblyCurrentGlContext;
 use glutin::prelude::GlSurface;
 
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawWindowHandle};
 
+use sdl2::video::Window;
+
+#[cfg(windows)]
+use glow as GL;
+#[cfg(windows)]
+use glow::HasContext;
 #[cfg(windows)]
 use windows::Win32::Foundation::HWND;
-
-use sdl2::video::Window;
+#[cfg(windows)]
 use winit::dpi::PhysicalSize;
+#[cfg(windows)]
+use winit_compat::HasWinitWindow;
 
 // http://developer.download.nvidia.com/devzone/devcenter/gamegraphics/files/OptimusRenderingPolicies.pdf
 #[cfg(target_os = "windows")]
@@ -175,10 +181,8 @@ fn run_flux(mode: Mode, config: Config) -> Result<(), String> {
     let video_subsystem = sdl_context.video()?;
 
     match mode {
+        #[cfg(windows)]
         Mode::Preview(raw_window_handle) => {
-            #[cfg(not(windows))]
-            panic!("Preview window unsupported");
-
             let mut instance = new_preview_window(&video_subsystem, raw_window_handle, &config)?;
             let start = std::time::Instant::now();
             let mut event_pump = sdl_context.event_pump()?;
@@ -187,22 +191,29 @@ fn run_flux(mode: Mode, config: Config) -> Result<(), String> {
         }
 
         Mode::Screensaver => {
+            #[cfg(windows)]
             let wallpaper_api = wallpaper::DesktopWallpaper::new().ok();
             let monitors = video_subsystem
                 .available_monitors()
                 .enumerate()
-                .map(|(index, monitor)| {
+                .map(|(_index, monitor)| {
                     (
                         monitor.clone(),
+                        #[cfg(windows)]
                         wallpaper_api
                             .as_ref()
-                            .and_then(|wallpaper| wallpaper.get(index as u32).ok()),
+                            .and_then(|wallpaper| wallpaper.get(_index as u32).ok()),
+                        #[cfg(not(windows))]
+                        None,
                     )
                 })
                 .collect::<Vec<(MonitorHandle, Option<std::path::PathBuf>)>>();
             log::debug!("Available monitors: {:?}", monitors);
 
+            #[cfg(windows)]
             let fill_mode = config.platform.windows.fill_mode;
+            #[cfg(not(windows))]
+            let fill_mode = config::FillMode::None;
             let surfaces = surface::build(&monitors, fill_mode);
             log::debug!("Creating windows: {:?}", surfaces);
 
@@ -232,6 +243,7 @@ fn run_flux(mode: Mode, config: Config) -> Result<(), String> {
     }
 }
 
+#[cfg(windows)]
 fn run_preview_loop(
     event_pump: &mut sdl2::EventPump,
     instance: &mut Instance,
@@ -404,8 +416,8 @@ fn new_instance(
 ) -> Result<Instance, String> {
     // Create the SDL window
     let window = video_subsystem
-        .window("Flux", surface.size.width, surface.size.height)
-        .position(surface.position.x, surface.position.y)
+        .window("Flux", surface.size().width, surface.size().height)
+        .position(surface.position().x, surface.position().y)
         .input_grabbed()
         .borderless()
         .hidden()
@@ -427,9 +439,9 @@ fn new_instance(
 
     let swapchain = create_swapchain(&window.raw_window_handle(), &gl_context);
 
-    let physical_size = surface.size;
-    let logical_size = physical_size.to_logical(surface.scale_factor);
-    let settings = config.to_settings(surface.wallpaper.clone());
+    let physical_size = surface.size();
+    let logical_size = physical_size.to_logical(surface.scale_factor());
+    let settings = config.to_settings(surface.wallpaper().clone());
     let flux = Flux::new(
         &Rc::clone(&gl_context.gl),
         logical_size.width,
@@ -450,8 +462,8 @@ fn new_instance(
 
 #[cfg(not(windows))]
 fn create_swapchain(
-    raw_window_handle: &RawWindowHandle,
-    gl_context: &gl_context::GLContext,
+    _raw_window_handle: &RawWindowHandle,
+    _gl_context: &gl_context::GLContext,
 ) -> Swapchain {
     Swapchain::Gl
 }

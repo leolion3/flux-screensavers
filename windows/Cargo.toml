@@ -30,32 +30,27 @@ glow = "0.12"
 indoc = "2"
 log = { version = "0.4", features = ["serde"] }
 log-panics = { version = "2", features = ["with-backtrace"]}
+ordered-float = "4.2.0"
 raw-window-handle = "0.5"
 semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 simplelog = "^0.12.0"
 tinyfiledialogs = { version = "3", default-features = false }
-
-[dependencies.winit]
-version = "0.29"
-git = "https://github.com/sandydoo/winit"
-branch = "flux"
-default-features = false
+winit = "0.29"
 
 [dependencies.sdl2]
 version = "0.36"
 default-features = false
 features = [ "static-link", "raw-window-handle" ]
 
-[dependencies.sdl2-sys]
+[target.'cfg(unix)'.dependencies.sdl2]
 version = "0.36"
-features = [ "static-link" ]
+default-features = false
+features = [ "use-pkgconfig" ]
 
 [dependencies.glutin]
 version = "0.31"
-default-features = false
-features = ["egl", "wgl"]
 
 # >=v0.10 drops iced_glow
 [dependencies.iced]
@@ -94,6 +89,7 @@ features = [
 ]
 
 [build-dependencies]
+cfg_aliases = "0.1.1"
 winres = "0.1.12"
 
 [patch.crates-io]

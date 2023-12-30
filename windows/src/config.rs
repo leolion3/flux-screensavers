@@ -196,6 +196,7 @@ pub enum FillMode {
     Fill,
 }
 
+#[cfg(windows)]
 impl FillMode {
     pub const ALL: [FillMode; 3] = [FillMode::None, FillMode::Span, FillMode::Fill];
 }

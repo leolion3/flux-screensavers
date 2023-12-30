@@ -1,15 +1,31 @@
-use std::collections::vec_deque;
-use std::iter::Map;
 use std::num::NonZeroU32;
 
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use winit::dpi::{PhysicalPosition, PhysicalSize};
 
-use winit::dpi::PhysicalSize;
-pub use winit::monitor::MonitorHandle;
-use winit::platform_impl::platform;
+#[derive(Debug, Clone, PartialEq)]
+pub struct MonitorHandle {
+    position: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+    scale_factor: f64,
+}
+
+impl MonitorHandle {
+    #[inline]
+    pub fn position(&self) -> PhysicalPosition<i32> {
+        self.position
+    }
+    #[inline]
+    pub fn size(&self) -> PhysicalSize<u32> {
+        self.size
+    }
+    #[inline]
+    pub fn scale_factor(&self) -> f64 {
+        self.scale_factor
+    }
+}
 
 pub trait HasWinitWindow {
     fn inner_size(&self) -> PhysicalSize<u32>;
@@ -29,32 +45,34 @@ impl HasWinitWindow for Window {
     }
 
     fn current_monitor(&self) -> Option<MonitorHandle> {
-        match self.raw_window_handle() {
-            RawWindowHandle::Win32(handle) => {
-                let inner = platform::monitor::current_monitor(handle.hwnd as _);
-                Some(MonitorHandle { inner })
-            }
-            _ => None,
-        }
+        self.display_index().ok().and_then(|id| {
+            self.subsystem()
+                .display_bounds(id)
+                .ok()
+                .map(|bounds| MonitorHandle {
+                    position: PhysicalPosition::new(bounds.x, bounds.y),
+                    size: bounds.size().into(),
+                    scale_factor: self.subsystem().display_dpi(id).unwrap().0 as f64 / 96.0,
+                })
+        })
     }
 }
 
 pub trait HasMonitors {
-    type Iter: Iterator<Item = MonitorHandle>;
-
-    fn available_monitors(&self) -> Self::Iter;
+    fn available_monitors(&self) -> impl Iterator<Item = MonitorHandle> + '_;
 }
 
 impl HasMonitors for VideoSubsystem {
-    type Iter = Map<
-        vec_deque::IntoIter<platform::monitor::MonitorHandle>,
-        fn(platform::monitor::MonitorHandle) -> MonitorHandle,
-    >;
-
-    fn available_monitors(&self) -> Self::Iter {
-        platform::monitor::available_monitors()
-            .into_iter()
-            .map(|inner| MonitorHandle { inner })
+    fn available_monitors(&self) -> impl Iterator<Item = MonitorHandle> + '_ {
+        let monitor_count = self.num_video_displays().unwrap();
+        (0..monitor_count).map(|id| {
+            let bounds = self.display_bounds(id).unwrap();
+            MonitorHandle {
+                position: PhysicalPosition::new(bounds.x, bounds.y),
+                size: bounds.size().into(),
+                scale_factor: self.display_dpi(id).unwrap().0 as f64 / 96.0,
+            }
+        })
     }
 }
 

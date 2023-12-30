@@ -15,6 +15,9 @@ use glutin::display::{Display, DisplayApiPreference, GetGlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
 
+#[cfg(glx_backend)]
+use winit::platform::x11::register_xlib_error_hook;
+
 pub struct GLContext {
     pub context: PossiblyCurrentContext,
     pub surface: Surface<WindowSurface>,
@@ -37,7 +40,7 @@ pub(crate) fn new_gl_context(
     raw_window_handle: RawWindowHandle,
     // A hack to create the gl_display using the invisible event window
     // we create for the preview.
-    attr_window: Option<RawWindowHandle>,
+    _attr_window: Option<RawWindowHandle>,
 ) -> GLContext {
     let template = ConfigTemplateBuilder::new()
         .with_buffer_type(glutin::config::ColorBufferType::Rgb {
@@ -51,9 +54,21 @@ pub(crate) fn new_gl_context(
         .build();
 
     // Only WGL requires a window to create a full-fledged OpenGL context
-    let attr_window = attr_window.unwrap_or(raw_window_handle);
-    let preference = DisplayApiPreference::WglThenEgl(Some(attr_window));
-    let gl_display = unsafe { Display::new(raw_display_handle, preference).unwrap() };
+    #[cfg(wgl_backend)]
+    let _attr_window = _attr_window.unwrap_or(raw_window_handle);
+    #[cfg(egl_backend)]
+    let _preference = DisplayApiPreference::Egl;
+    #[cfg(glx_backend)]
+    let _preference = DisplayApiPreference::Glx(Box::new(register_xlib_error_hook));
+    #[cfg(cgl_backend)]
+    let _preference = DisplayApiPreference::Cgl;
+    #[cfg(wgl_backend)]
+    let _preference = DisplayApiPreference::Wgl(Some(raw_window_handle));
+    #[cfg(all(wgl_backend, egl_backend))]
+    let _preference = DisplayApiPreference::WglThenEgl(Some(_attr_window));
+    #[cfg(all(glx_backend, egl_backend))]
+    let _preference = DisplayApiPreference::GlxThenEgl(Box::new(register_xlib_error_hook));
+    let gl_display = unsafe { Display::new(raw_display_handle, _preference).unwrap() };
 
     // Rank the configs by transparency and alpha size, while prefering the original order of the
     // configs.

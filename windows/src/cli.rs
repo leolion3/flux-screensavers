@@ -1,4 +1,6 @@
+#[cfg(windows)]
 use raw_window_handle::RawWindowHandle;
+#[cfg(windows)]
 use std::ffi::c_void;
 
 #[cfg(windows)]
@@ -6,11 +8,13 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 
 #[derive(PartialEq)]
 pub enum Mode {
+    #[cfg(windows)]
     Preview(RawWindowHandle),
     Screensaver,
     Settings,
 }
 
+#[cfg(windows)]
 pub fn read_flags() -> Result<Mode, String> {
     match std::env::args().nth(1).as_mut().map(|s| {
         s.make_ascii_lowercase();
@@ -64,4 +68,9 @@ pub fn read_flags() -> Result<Mode, String> {
             return Err(format!("I don’t know what the argument {} is.", s));
         }
     }
+}
+
+#[cfg(not(windows))]
+pub fn read_flags() -> Result<Mode, String> {
+    Ok(Mode::Screensaver)
 }

@@ -1,17 +1,49 @@
 use std::collections::HashMap;
 use std::path;
 
+use ordered_float::OrderedFloat;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::monitor::MonitorHandle;
 
 use crate::config;
+use crate::winit_compat::MonitorHandle;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Surface {
-    pub position: PhysicalPosition<i32>,
-    pub size: PhysicalSize<u32>,
-    pub scale_factor: f64,
-    pub wallpaper: Option<path::PathBuf>,
+    position: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+    scale_factor: OrderedFloat<f64>,
+    wallpaper: Option<path::PathBuf>,
+}
+
+impl PartialOrd for Surface {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.position.partial_cmp(&other.position)
+    }
+}
+
+impl Ord for Surface {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.position.cmp(&other.position)
+    }
+}
+
+impl Surface {
+    #[inline]
+    pub fn position(&self) -> PhysicalPosition<i32> {
+        self.position
+    }
+    #[inline]
+    pub fn size(&self) -> PhysicalSize<u32> {
+        self.size
+    }
+    #[inline]
+    pub fn scale_factor(&self) -> f64 {
+        self.scale_factor.into()
+    }
+    #[inline]
+    pub fn wallpaper(&self) -> &Option<path::PathBuf> {
+        &self.wallpaper
+    }
 }
 
 impl Surface {
@@ -19,7 +51,7 @@ impl Surface {
         Self {
             position: monitor.position(),
             size: monitor.size(),
-            scale_factor: monitor.scale_factor(),
+            scale_factor: monitor.scale_factor().into(),
             wallpaper: wallpaper.clone(),
         }
     }
@@ -64,7 +96,9 @@ fn extend(surfaces: Vec<Surface>) -> Vec<Surface> {
             .and_modify(|existing_surface| existing_surface.merge(&surface))
             .or_insert_with(|| surface);
     }
-    grouping.into_values().collect::<Vec<Surface>>()
+    let mut extended_surfaces = grouping.into_values().collect::<Vec<Surface>>();
+    extended_surfaces.sort();
+    extended_surfaces
 }
 
 fn fill(surfaces: Vec<Surface>) -> Vec<Surface> {
@@ -103,13 +137,13 @@ mod test {
         let display0 = Surface {
             position: (0, 0).into(),
             size: (3360, 2100).into(),
-            scale_factor: 1.0,
+            scale_factor: 1.0.into(),
             wallpaper: None,
         };
         let display1 = Surface {
             position: (3360, 0).into(),
             size: (2560, 1440).into(),
-            scale_factor: 1.0,
+            scale_factor: 1.0.into(),
             wallpaper: None,
         };
 
@@ -124,21 +158,21 @@ mod test {
         let display0 = Surface {
             position: (-500, 0).into(),
             size: (1920, 1080).into(),
-            scale_factor: 1.0,
+            scale_factor: 1.0.into(),
             wallpaper: None,
         };
         let display1 = Surface {
             position: (1420, 0).into(),
             size: (2560, 1440).into(),
-            scale_factor: 1.0,
+            scale_factor: 1.0.into(),
             wallpaper: None,
         };
         assert_eq!(
             fill(vec![display0, display1]),
             vec![Surface {
                 position: (-500, 0).into(),
-                size: (3980, 1440).into(),
-                scale_factor: 1.0,
+                size: (4480, 1440).into(),
+                scale_factor: 1.0.into(),
                 wallpaper: None,
             }]
         );

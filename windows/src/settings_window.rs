@@ -1,16 +1,20 @@
-use crate::config::{ColorMode, Config, FillMode};
+#[cfg(windows)]
+use crate::config::FillMode;
+use crate::config::{ColorMode, Config};
 
 use async_std::task;
-use indoc::indoc;
 use std::path::PathBuf;
 use tinyfiledialogs::open_file_dialog;
 
 use iced::alignment::{Alignment, Horizontal};
 use iced::executor;
 use iced::theme;
-use iced::widget::{button, column, container, pick_list, row, scrollable, text};
+use iced::widget::{button, column, container, pick_list, row, text};
 use iced::window;
 use iced::{Application, Command, Element, Length, Theme};
+
+#[cfg(windows)]
+use indoc::indoc;
 
 pub fn run(config: Config) -> iced::Result {
     Config::run(iced::Settings {
@@ -29,11 +33,13 @@ pub fn run(config: Config) -> iced::Result {
 #[derive(Debug, Clone)]
 pub enum Message {
     SetColorMode(ColorMode),
-    SetFillMode(FillMode),
     OpenFilePicker,
     SetImageFile(Option<String>),
     Save,
     Cancel,
+
+    #[cfg(windows)]
+    SetFillMode(FillMode),
 }
 
 impl Application for Config {
@@ -54,11 +60,6 @@ impl Application for Config {
         match message {
             Message::SetColorMode(new_color) => {
                 self.flux.color_mode = new_color;
-                Command::none()
-            }
-
-            Message::SetFillMode(new_fill_mode) => {
-                self.platform.windows.fill_mode = new_fill_mode;
                 Command::none()
             }
 
@@ -88,6 +89,12 @@ impl Application for Config {
             }
 
             Message::Cancel => window::close(),
+
+            #[cfg(windows)]
+            Message::SetFillMode(new_fill_mode) => {
+                self.platform.windows.fill_mode = new_fill_mode;
+                Command::none()
+            }
         }
     }
 
@@ -121,25 +128,6 @@ impl Application for Config {
             color_section = color_section.push(image_picker);
         }
 
-        let fill_list = pick_list(
-            &FillMode::ALL[..],
-            Some(self.platform.windows.fill_mode),
-            Message::SetFillMode,
-        )
-        .padding(8);
-
-        let fill_section = column![
-            text("Fill mode").size(20.0),
-            "Configure how Flux works across multiple monitors.",
-            indoc! {"
-                None: Each monitor is a separate surface.
-                Span: Combines any matching adjacent monitors.
-                Fill: Combines all monitors into a single seamless surface.
-            "},
-            fill_list,
-        ]
-        .spacing(12);
-
         let save_button = button(text("Save").horizontal_alignment(Horizontal::Center))
             .padding(8)
             .width(Length::Fixed(96.0))
@@ -151,11 +139,37 @@ impl Application for Config {
             .on_press(Message::Cancel);
         let button_row = container(row![save_button, cancel_button].spacing(12));
 
-        let content = column![color_section, fill_section, button_row]
+        let mut content = column![color_section]
             .height(Length::Fill)
             .width(Length::Fill)
             .spacing(36)
             .padding(36);
+
+        #[cfg(windows)]
+        {
+            let fill_list = pick_list(
+                &FillMode::ALL[..],
+                Some(self.platform.windows.fill_mode),
+                Message::SetFillMode,
+            )
+            .padding(8);
+
+            let fill_section = column![
+                text("Fill mode").size(20.0),
+                "Configure how Flux works across multiple monitors.",
+                indoc! {"
+                None: Each monitor is a separate surface.
+                Span: Combines any matching adjacent monitors.
+                Fill: Combines all monitors into a single seamless surface.
+            "},
+                fill_list,
+            ]
+            .spacing(12);
+
+            content = content.push(fill_section)
+        }
+
+        content = content.push(button_row);
 
         container(content)
             .width(Length::Fill)
