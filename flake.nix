@@ -2,13 +2,12 @@
   description = "Flux Screensavers";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
     flake-utils.url = "github:numtide/flake-utils";
     crane = {
       url = "github:ipetkov/crane";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
       };
     };
     rust-overlay = {
@@ -26,69 +25,94 @@
     flake-utils,
     crane,
     rust-overlay,
-  }:
-    nixpkgs.lib.recursiveUpdate {
-      devShells.aarch64-darwin.default = let
-        pkgs = import nixpkgs {
-          system = "aarch64-darwin";
-          overlays = [(import rust-overlay)];
-        };
-
-        rustToolchain = pkgs.pkgsBuildHost.rust-bin.nightly.latest.default;
-      in
-        pkgs.mkShell {
-          packages = with pkgs; [rustToolchain alejandra];
-        };
-    } (flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
-      pkgs = import nixpkgs {
-        inherit system;
-        crossSystem.config = "x86_64-w64-mingw32";
-        overlays = [(import rust-overlay)];
-      };
-
-      rustToolchain = pkgs.pkgsBuildHost.rust-bin.nightly.latest.default.override {
-        extensions = [
-          "rust-src"
-          "cargo"
-          "rustc"
-          "rls"
-          "rust-analyzer"
-          "rustfmt"
-        ];
-        targets = ["x86_64-pc-windows-gnu"];
-      };
-
-      craneLib = (crane.mkLib pkgs).overrideScope' (final: prev: {
-        rustc = rustToolchain;
-        cargo = rustToolchain;
-        rustfmt = rustToolchain;
-      });
-
-      SDL2_static = pkgs.SDL2.overrideAttrs (old: rec {
-        version = "2.26.5";
-        name = "SDL2-static-${version}";
-        src = builtins.fetchurl {
-          url =
-            "https://www.libsdl.org/release/${old.pname}-${version}.tar.gz";
-          sha256 =
-            "sha256:1xxbbvn0jmw5fgn26fyybc7xd3xsnjk67lxi8lychr5yl4yym3xd";
-        };
+  }: let
+    sdl2StaticDrv = {SDL2, lib, targetPlatform, ... }:
+      SDL2.overrideAttrs (old: {
+        name = "SDL2-static-${old.version}";
         dontDisableStatic = true;
 
         # When statically linking for Windows, rust-sdl2 expects the library to be called 'SDL2-static'.
         # https://github.com/Rust-SDL2/rust-sdl2/blob/ffa4eb0b15439463561014f2d3c9d9171059d492/sdl2-sys/build.rs#L237-L238
-        postInstall = ''
-          mv $out/lib/libSDL2.a $out/lib/libSDL2-static.a
-          mv $out/lib/libSDL2.dll.a $out/lib/libSDL2-static.dll.a
-        '';
+        postInstall = lib.concatLines [
+            old.postInstall
+            (lib.optionalString targetPlatform.isWindows ''
+              mv $out/lib/libSDL2.a $out/lib/libSDL2-static.a
+              mv $out/lib/libSDL2.dll.a $out/lib/libSDL2-static.dll.a
+            '')
+          ];
       });
-    in {
-      devShells = {
-        default = pkgs.pkgsBuildHost.mkShell {
-         # inputsFrom = [packages.default];
+
+    extensions = [
+      "rust-src"
+      "cargo"
+      "rustc"
+      "rls"
+      "rust-analyzer"
+      "rustfmt"
+    ];
+  in
+    nixpkgs.lib.foldAttrs nixpkgs.lib.recursiveUpdate {} [
+      (flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"] (
+        system: let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [(import rust-overlay)];
+          };
+
+          inherit (pkgs) stdenv lib;
+
+          rustToolchain = pkgs.rust-bin.nightly.latest.default.override {inherit extensions;};
+
+          sdl2Static = pkgs.callPackage sdl2StaticDrv {};
+        in {
+          devShells.default = pkgs.mkShell {
+            packages = with pkgs; [
+              pkg-config
+              rustToolchain
+              sdl2Static
+              cargo-outdated
+              fontconfig
+              cmake
+              alejandra
+            ] ++ lib.optionals stdenv.isLinux [
+              pkgs.xorg.libX11
+              pkgs.xorg.libXext
+              pkgs.xorg.libXrandr
+              pkgs.xorg.libXi
+              pkgs.xorg.libXScrnSaver
+              pkgs.xorg.libXcursor
+            ];
+          };
+        }
+      ))
+      (flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
+        target = "x86_64-pc-windows-gnu";
+
+        pkgs = import nixpkgs {
+          inherit system;
+          crossSystem.config = "x86_64-w64-mingw32";
+          overlays = [(import rust-overlay)];
+        };
+
+        rustToolchain = pkgs.pkgsBuildHost.rust-bin.nightly.latest.default.override {
+          inherit extensions;
+          targets = [target];
+        };
+
+        craneLib = (crane.mkLib pkgs).overrideScope' (final: prev: {
+          rustc = rustToolchain;
+          cargo = rustToolchain;
+          rustfmt = rustToolchain;
+        });
+
+        sdl2Static = pkgs.callPackage sdl2StaticDrv {};
+      in {
+        devShells.cross = pkgs.pkgsBuildHost.mkShell {
+          # inputsFrom = [packages.default];
 
           packages = with pkgs.pkgsBuildHost; [
             rustToolchain
+            sdl2Static
             cargo-outdated
             fontconfig
             cmake
@@ -96,12 +120,10 @@
             nsis
           ];
 
-          RUSTFLAGS = "-L ${SDL2_static}/lib";
+          RUSTFLAGS = "-L ${sdl2Static}/lib";
         };
-      };
 
-      packages = {
-        windows = rec {
+        packages.windows = rec {
           default = installer;
 
           installer = pkgs.stdenvNoCC.mkDerivation {
@@ -109,7 +131,7 @@
             version = flux.version;
             src = ./windows/installer;
 
-            buildInputs = with pkgs.pkgsBuildHost; [ nsis flux ];
+            buildInputs = with pkgs.pkgsBuildHost; [nsis flux];
 
             installPhase = ''
               mkdir -p $out/bin
@@ -129,13 +151,13 @@
             buildInputs = [
               pkgs.windows.pthreads
               pkgs.windows.mingw_w64_pthreads
-              SDL2_static
+              sdl2Static
             ];
 
-            CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
+            CARGO_BUILD_TARGET = target;
             CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${pkgs.stdenv.cc.targetPrefix}cc";
             # Link to the static SDL2 library and export the static GPU preference symbols
-            RUSTFLAGS = "-L ${SDL2_static}/lib -Zexport-executable-symbols";
+            RUSTFLAGS = "-L ${sdl2Static}/lib -Zexport-executable-symbols";
 
             # Change the extension to .scr (Windows screensaver)
             postInstall = ''
@@ -145,6 +167,6 @@
             '';
           };
         };
-      };
-    }));
+      }))
+    ];
 }
