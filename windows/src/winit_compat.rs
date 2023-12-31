@@ -41,7 +41,7 @@ impl HasWinitWindow for Window {
 
     fn scale_factor(&self) -> f64 {
         let id = self.display_index().unwrap();
-        self.subsystem().display_dpi(id).unwrap().0 as f64 / 96.0
+        compute_dpi(self.subsystem().display_dpi(id).ok())
     }
 
     fn current_monitor(&self) -> Option<MonitorHandle> {
@@ -52,7 +52,7 @@ impl HasWinitWindow for Window {
                 .map(|bounds| MonitorHandle {
                     position: PhysicalPosition::new(bounds.x, bounds.y),
                     size: bounds.size().into(),
-                    scale_factor: self.subsystem().display_dpi(id).unwrap().0 as f64 / 96.0,
+                    scale_factor: compute_dpi(self.subsystem().display_dpi(id).ok()),
                 })
         })
     }
@@ -70,10 +70,14 @@ impl HasMonitors for VideoSubsystem {
             MonitorHandle {
                 position: PhysicalPosition::new(bounds.x, bounds.y),
                 size: bounds.size().into(),
-                scale_factor: self.display_dpi(id).unwrap().0 as f64 / 96.0,
+                scale_factor: compute_dpi(self.display_dpi(id).ok()),
             }
         })
     }
+}
+
+fn compute_dpi(some_dpi: Option<(f32, f32, f32)>) -> f64 {
+    some_dpi.map(|dpi| dpi.0 as f64).unwrap_or(1.0) / 96.0
 }
 
 /// [`winit::dpi::PhysicalSize<u32>`] non-zero extensions.
