@@ -63,8 +63,23 @@
 
           rustToolchain = pkgs.rust-bin.nightly.latest.default.override {inherit extensions;};
 
+          craneLib = (crane.mkLib pkgs).overrideScope' (final: prev: {
+            rustc = rustToolchain;
+            cargo = rustToolchain;
+            rustfmt = rustToolchain;
+          });
+
           sdl2Static = pkgs.callPackage sdl2StaticDrv {};
-        in {
+
+          x11BuildInputs = [
+              pkgs.xorg.libX11
+              pkgs.xorg.libXext
+              pkgs.xorg.libXrandr
+              pkgs.xorg.libXi
+              pkgs.xorg.libXScrnSaver
+              pkgs.xorg.libXcursor
+            ];
+        in rec {
           devShells.default = pkgs.mkShell {
             packages = with pkgs; [
               pkg-config
@@ -74,15 +89,45 @@
               fontconfig
               cmake
               alejandra
-            ] ++ lib.optionals stdenv.isLinux [
-              pkgs.xorg.libX11
-              pkgs.xorg.libXext
-              pkgs.xorg.libXrandr
-              pkgs.xorg.libXi
-              pkgs.xorg.libXScrnSaver
-              pkgs.xorg.libXcursor
-            ];
+            ] ++ lib.optionals stdenv.isLinux x11BuildInputs;
           };
+
+          packages.default = packages.flux-wrapped;
+
+          packages.flux = craneLib.buildPackage {
+            src = ./windows;
+            release = true;
+
+            buildInputs = with pkgs; [
+              pkg-config
+              fontconfig
+              cmake
+              sdl2Static
+            ] ++ lib.optionals stdenv.isLinux x11BuildInputs;
+          };
+
+          packages.flux-wrapped = let 
+            runtimeLibraries = with pkgs; [
+              wayland
+              wayland-protocols
+              xorg.libX11
+              xorg.libXcursor
+              xorg.libXrandr
+              xorg.libXi
+              libGL
+            ];
+            in pkgs.stdenvNoCC.mkDerivation {
+              name = "flux-screensaver-wrapped";
+              inherit (packages.flux) version;
+              nativeBuildInputs = [pkgs.makeWrapper];
+              buildCommand = ''
+                mkdir -p $out/bin
+                cp ${packages.flux}/bin/Flux $out/bin
+                wrapProgram $out/bin/Flux \
+                  --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath runtimeLibraries}
+              '';
+              passthru.unwrapped = packages.flux;
+            };
         }
       ))
       (flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
