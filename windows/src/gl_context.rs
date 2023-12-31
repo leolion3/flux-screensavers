@@ -77,6 +77,7 @@ pub(crate) fn new_gl_context(
         supports_transparency: bool,
         alpha_size: u8,
         samples: i8,
+        supports_srgb: bool,
         prefer_original_order: isize,
     }
 
@@ -93,6 +94,7 @@ pub(crate) fn new_gl_context(
                 supports_transparency: config.supports_transparency().unwrap_or(false),
                 alpha_size: config.alpha_size(),
                 samples: -(config.num_samples() as i8),
+                supports_srgb: config.srgb_capable(),
                 prefer_original_order: -(*index as isize),
             })
             .expect("cannot find a suitable GL config")
