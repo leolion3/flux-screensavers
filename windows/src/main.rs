@@ -118,7 +118,7 @@ fn main() {
 
     let config = Config::load(config_dir);
 
-    match cli::read_flags().and_then(|mode| {
+    let res = cli::read_flags().and_then(|mode| {
         if mode == Mode::Settings {
             settings_window::run(config)
                 .map_err(|err| log::error!("{}", err))
@@ -127,7 +127,9 @@ fn main() {
         }
 
         run_flux(mode, config)
-    }) {
+    });
+
+    match res {
         Ok(_) => process::exit(0),
         Err(err) => {
             log::error!("{}", err);

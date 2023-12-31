@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path;
+use std::{cmp::Ordering, path};
 
 use ordered_float::OrderedFloat;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
@@ -16,13 +16,13 @@ pub struct Surface {
 }
 
 impl PartialOrd for Surface {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.position.partial_cmp(&other.position)
+    fn partial_cmp(&self, other: &Surface) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Surface {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.position.cmp(&other.position)
     }
 }
