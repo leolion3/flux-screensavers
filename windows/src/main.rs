@@ -465,8 +465,19 @@ fn new_instance(
 #[cfg(not(windows))]
 fn create_swapchain(
     _raw_window_handle: &RawWindowHandle,
-    _gl_context: &gl_context::GLContext,
+    gl_context: &gl_context::GLContext,
 ) -> Swapchain {
+    use glutin::surface::SwapInterval;
+    use std::num::NonZeroU32;
+
+    // Try setting vsync.
+    if let Err(res) = gl_context.surface.set_swap_interval(
+        &gl_context.context,
+        SwapInterval::Wait(NonZeroU32::new(1).unwrap()),
+    ) {
+        log::error!("Failed to set vsync: {res:?}");
+    }
+
     Swapchain::Gl
 }
 
