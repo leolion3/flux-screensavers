@@ -2,7 +2,7 @@ mod v1;
 
 use log::Level;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, fmt, fs, io, path};
+use std::{fmt, fs, io, path};
 
 const LATEST_VERSION: u8 = 2;
 
@@ -97,14 +97,18 @@ impl Config {
 
         let config_ast: serde_json::Value =
             serde_json::from_str(config_string).map_err(to_decode_error)?;
-        let version: Cow<'_, str> =
-            serde_json::from_value(config_ast["version"].clone()).map_err(to_decode_error)?;
 
-        match version.as_ref() {
-            "0.1.0" => serde_json::from_value::<v1::Config>(config_ast)
+        // Check for legacy string versions
+        let raw_version = &config_ast["version"];
+        if let serde_json::Value::String(_) = raw_version {
+            return serde_json::from_value::<v1::Config>(config_ast)
                 .map(|config| config.upgrade())
-                .map_err(to_decode_error),
-            "2" => serde_json::from_value(config_ast).map_err(to_decode_error),
+                .map_err(to_decode_error);
+        }
+
+        let version = serde_json::from_value::<u8>(raw_version.clone()).map_err(to_decode_error)?;
+        match version {
+            2 => serde_json::from_value(config_ast).map_err(to_decode_error),
             _ => Err(Problem::UnsupportedVersion {
                 version: version.to_string(),
             }),
