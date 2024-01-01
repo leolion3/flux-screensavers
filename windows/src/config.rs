@@ -1,10 +1,16 @@
+mod v1;
+
+use log::Level;
 use serde::{Deserialize, Serialize};
-use std::{fmt, fs, io, path};
+use std::{borrow::Cow, fmt, fs, io, path};
+
+const LATEST_VERSION: u8 = 2;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Config {
-    pub version: semver::Version,
+    pub version: u8,
+    #[serde(with = "LogLevelDef")]
     pub log_level: log::Level,
     pub flux: FluxSettings,
     pub platform: PlatformConfig,
@@ -14,11 +20,21 @@ pub struct Config {
     location: Option<path::PathBuf>,
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(remote = "Level", rename_all = "camelCase")]
+enum LogLevelDef {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             // Latest version of the config
-            version: semver::Version::parse("0.1.0").unwrap(),
+            version: LATEST_VERSION,
             log_level: log::Level::Warn,
             flux: Default::default(),
             platform: Default::default(),
@@ -61,17 +77,38 @@ impl Config {
         self
     }
 
-    fn load_existing_config(config_path: &path::Path) -> Result<Config, Problem> {
+    fn load_existing_config(config_path: &path::Path) -> Result<Self, Problem> {
         let config_string =
             fs::read_to_string(config_path).map_err(|err| Problem::ReadSettings {
                 path: config_path.to_owned(),
                 err,
             })?;
 
-        serde_json::from_str(&config_string).map_err(|err| Problem::DecodeSettings {
-            path: config_path.to_owned(),
+        Self::from_string(&config_string, Some(config_path))
+    }
+
+    fn from_string(config_string: &str, config_path: Option<&path::Path>) -> Result<Self, Problem> {
+        let to_decode_error = |err| Problem::DecodeSettings {
+            path: config_path
+                .unwrap_or_else(|| path::Path::new(""))
+                .to_owned(),
             err,
-        })
+        };
+
+        let config_ast: serde_json::Value =
+            serde_json::from_str(config_string).map_err(to_decode_error)?;
+        let version: Cow<'_, str> =
+            serde_json::from_value(config_ast["version"].clone()).map_err(to_decode_error)?;
+
+        match version.as_ref() {
+            "0.1.0" => serde_json::from_value::<v1::Config>(config_ast)
+                .map(|config| config.upgrade())
+                .map_err(to_decode_error),
+            "2" => serde_json::from_value(config_ast).map_err(to_decode_error),
+            _ => Err(Problem::UnsupportedVersion {
+                version: version.to_string(),
+            }),
+        }
     }
 
     pub fn save(&self) -> Result<(), Problem> {
@@ -100,8 +137,8 @@ impl Config {
         use flux::settings;
 
         let color_mode = match &self.flux.color_mode {
-            ColorMode::Preset(preset) => settings::ColorMode::Preset(*preset),
-            ColorMode::ImageFile => self.flux.image_path.clone().map_or(
+            ColorMode::Preset { preset_name } => settings::ColorMode::Preset(*preset_name),
+            ColorMode::ImageFile { image_path } => image_path.clone().map_or(
                 settings::ColorMode::default(),
                 settings::ColorMode::ImageFile,
             ),
@@ -118,32 +155,48 @@ impl Config {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct FluxSettings {
+    #[serde(flatten)]
     pub color_mode: ColorMode,
-    pub image_path: Option<path::PathBuf>,
 }
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "colorMode", rename_all = "camelCase")]
 pub enum ColorMode {
-    Preset(flux::settings::ColorPreset),
-    ImageFile,
+    Preset {
+        #[serde(rename = "presetName")]
+        preset_name: flux::settings::ColorPreset,
+    },
+    ImageFile {
+        #[serde(rename = "imagePath")]
+        image_path: Option<path::PathBuf>,
+    },
     DesktopImage,
 }
 
 impl Default for ColorMode {
     fn default() -> Self {
-        Self::Preset(Default::default())
+        Self::Preset {
+            preset_name: Default::default(),
+        }
     }
 }
 
 use flux::settings::ColorPreset;
 impl ColorMode {
     pub const ALL: [ColorMode; 5] = [
-        ColorMode::Preset(ColorPreset::Original),
-        ColorMode::Preset(ColorPreset::Plasma),
-        ColorMode::Preset(ColorPreset::Poolside),
+        ColorMode::Preset {
+            preset_name: ColorPreset::Original,
+        },
+        ColorMode::Preset {
+            preset_name: ColorPreset::Plasma,
+        },
+        ColorMode::Preset {
+            preset_name: ColorPreset::Poolside,
+        },
         ColorMode::DesktopImage,
-        ColorMode::ImageFile,
+        ColorMode::ImageFile { image_path: None },
     ];
 }
 
@@ -153,9 +206,9 @@ impl std::fmt::Display for ColorMode {
             f,
             "{}",
             match self {
-                ColorMode::Preset(preset) => {
+                ColorMode::Preset { preset_name } => {
                     use flux::settings::ColorPreset::*;
-                    match preset {
+                    match preset_name {
                         Original => "Original",
                         Plasma => "Plasma",
                         Poolside => "Poolside",
@@ -163,14 +216,14 @@ impl std::fmt::Display for ColorMode {
                     }
                 }
                 ColorMode::DesktopImage => "From wallpaper",
-                ColorMode::ImageFile => "From image",
+                ColorMode::ImageFile { .. } => "From image",
             }
         )
     }
 }
 
 #[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 // Platform-specific configuration
 pub struct PlatformConfig {
     #[cfg(windows)]
@@ -178,13 +231,14 @@ pub struct PlatformConfig {
 }
 
 #[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 // Windows-specific configuration
 pub struct WindowsConfig {
     pub fill_mode: FillMode,
 }
 
 #[derive(Default, Deserialize, Serialize, Copy, Clone, Debug, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 // Configures how Flux works with multiple displays.
 pub enum FillMode {
     // Display a separate instance on each display
@@ -230,6 +284,9 @@ pub enum Problem {
         path: path::PathBuf,
         err: serde_json::Error,
     },
+    UnsupportedVersion {
+        version: String,
+    },
     NoSaveLocation,
     Save {
         path: path::PathBuf,
@@ -267,6 +324,9 @@ impl fmt::Display for Problem {
                     err
                 )
             }
+            Problem::UnsupportedVersion { version } => {
+                write!(f, "Unsupported settings version {}.", version)
+            }
             Problem::NoSaveLocation => write!(f, "No location available to save the settings"),
             Problem::Save { path, err } => {
                 write!(
@@ -280,5 +340,70 @@ impl fmt::Display for Problem {
                 write!(f, "IO error: {}", err)
             }
         }
+    }
+}
+
+trait UpgradableConfig {
+    type UpgradedConfig;
+
+    fn upgrade(&self) -> Self::UpgradedConfig;
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn serialize() {
+        use serde_json::json;
+        let config = Config {
+            version: LATEST_VERSION,
+            log_level: log::Level::Warn,
+            flux: FluxSettings {
+                color_mode: ColorMode::Preset {
+                    preset_name: flux::settings::ColorPreset::Original,
+                },
+            },
+            platform: PlatformConfig::default(),
+            location: None,
+        };
+        let expected = json!({
+            "version": 2,
+            "logLevel": "warn",
+            "flux": {
+                "colorMode": "preset",
+                "presetName": "Original"
+            },
+            "platform": {}
+        });
+        assert_eq!(serde_json::to_value(config).unwrap(), expected);
+    }
+
+    #[test]
+    fn deserialize_from_0_1_0() {
+        use serde_json::json;
+
+        let json_config = json!({
+            "version": "0.1.0",
+            "log_level": "WARN",
+            "flux": {
+                "color_mode": { "Preset": "Original" },
+            }
+        });
+
+        assert_eq!(
+            Config::from_string(&json_config.to_string(), None).unwrap(),
+            Config {
+                version: LATEST_VERSION,
+                log_level: log::Level::Warn,
+                flux: FluxSettings {
+                    color_mode: ColorMode::Preset {
+                        preset_name: flux::settings::ColorPreset::Original,
+                    },
+                },
+                platform: PlatformConfig::default(),
+                location: None,
+            }
+        );
     }
 }

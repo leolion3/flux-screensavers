@@ -77,8 +77,9 @@ impl Application for Config {
             Message::SetImageFile(some_path) => {
                 if let Some(path_string) = some_path {
                     let path = PathBuf::from(path_string);
-                    self.flux.color_mode = ColorMode::ImageFile;
-                    self.flux.image_path = Some(path);
+                    self.flux.color_mode = ColorMode::ImageFile {
+                        image_path: Some(path),
+                    };
                 }
                 Command::none()
             }
@@ -101,7 +102,7 @@ impl Application for Config {
     fn view(&self) -> Element<Message> {
         let color_list = pick_list(
             &ColorMode::ALL[..],
-            Some(self.flux.color_mode),
+            Some(self.flux.color_mode.clone()),
             Message::SetColorMode,
         )
         .padding(8);
@@ -113,7 +114,7 @@ impl Application for Config {
         ]
         .spacing(12);
 
-        if self.flux.color_mode == ColorMode::ImageFile {
+        if let ColorMode::ImageFile { image_path } = &self.flux.color_mode {
             let mut image_picker = row![]
                 .push(
                     button("Select image")
@@ -122,8 +123,8 @@ impl Application for Config {
                 )
                 .align_items(Alignment::Center)
                 .spacing(12);
-            if let Some(image_path) = &self.flux.image_path {
-                image_picker = image_picker.push(text(image_path.display()));
+            if let Some(path) = &image_path {
+                image_picker = image_picker.push(text(path.display()));
             }
             color_section = color_section.push(image_picker);
         }
