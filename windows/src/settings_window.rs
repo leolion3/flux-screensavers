@@ -18,7 +18,7 @@ pub fn run(config: Config) -> iced::Result {
     Config::run(iced::Settings {
         flags: config,
         window: iced::window::Settings {
-            size: (420, 520),
+            size: (420, 600),
             resizable: false,
             decorations: true,
             ..Default::default()
@@ -136,7 +136,6 @@ impl Application for Config {
         let button_row = container(row![save_button, cancel_button].spacing(12));
 
         let mut content = column![color_section]
-            .height(Length::Fill)
             .width(Length::Fill)
             .spacing(36)
             .padding(36);
@@ -171,10 +170,7 @@ impl Application for Config {
             .push(vertical_space(Length::Fill))
             .push(version_text);
 
-        container(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        container(content).into()
     }
 
     fn theme(&self) -> Theme {
