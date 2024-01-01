@@ -89,7 +89,26 @@
               fontconfig
               cmake
               alejandra
-            ] ++ lib.optionals stdenv.isLinux x11BuildInputs;
+            ] ++ lib.optionals stdenv.isLinux x11BuildInputs
+              ++ lib.optionals stdenv.isDarwin
+              (with pkgs.darwin.apple_sdk.frameworks; [
+                AppKit
+                ApplicationServices
+                AudioToolbox
+                Cocoa
+                CoreAudio
+                CoreFoundation
+                CoreGraphics
+                CoreHaptics
+                CoreText
+                CoreVideo
+                ForceFeedback
+                Foundation
+                GameController
+                Metal
+                OpenGL
+                QuartzCore
+              ]);
           };
 
           packages.default = packages.flux-wrapped;
