@@ -230,7 +230,6 @@ impl std::fmt::Display for ColorMode {
 #[serde(default, rename_all = "camelCase")]
 // Platform-specific configuration
 pub struct PlatformConfig {
-    #[cfg(windows)]
     pub windows: WindowsConfig,
 }
 
@@ -254,7 +253,6 @@ pub enum FillMode {
     Fill,
 }
 
-#[cfg(windows)]
 impl FillMode {
     pub const ALL: [FillMode; 3] = [FillMode::None, FillMode::Span, FillMode::Fill];
 }
@@ -358,14 +356,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn serialize() {
+    fn serialize_deserialize() {
         use serde_json::json;
         let config = Config {
             version: LATEST_VERSION,
             log_level: log::Level::Warn,
             flux: FluxSettings {
                 color_mode: ColorMode::Preset {
-                    preset_name: flux::settings::ColorPreset::Original,
+                    preset_name: flux::settings::ColorPreset::Plasma,
                 },
             },
             platform: PlatformConfig::default(),
@@ -376,11 +374,20 @@ mod test {
             "logLevel": "warn",
             "flux": {
                 "colorMode": "preset",
-                "presetName": "Original"
+                "presetName": "Plasma"
             },
-            "platform": {}
+            "platform": {
+                "windows": {
+                    "fillMode": "span"
+                }
+            }
         });
-        assert_eq!(serde_json::to_value(config).unwrap(), expected);
+        assert_eq!(serde_json::to_value(&config).unwrap(), expected);
+
+        assert_eq!(
+            Config::from_string(&expected.to_string(), None).unwrap(),
+            config
+        );
     }
 
     #[test]
@@ -391,7 +398,7 @@ mod test {
             "version": "0.1.0",
             "log_level": "WARN",
             "flux": {
-                "color_mode": { "Preset": "Original" },
+                "color_mode": { "Preset": "Plasma" }
             }
         });
 
@@ -402,7 +409,7 @@ mod test {
                 log_level: log::Level::Warn,
                 flux: FluxSettings {
                     color_mode: ColorMode::Preset {
-                        preset_name: flux::settings::ColorPreset::Original,
+                        preset_name: flux::settings::ColorPreset::Plasma,
                     },
                 },
                 platform: PlatformConfig::default(),

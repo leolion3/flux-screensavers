@@ -1,8 +1,7 @@
-#[cfg(windows)]
-use crate::config::FillMode;
-use crate::config::{ColorMode, Config};
+use crate::config::{ColorMode, Config, FillMode};
 
 use async_std::task;
+use indoc::indoc;
 use std::path::PathBuf;
 use tinyfiledialogs::open_file_dialog;
 
@@ -12,9 +11,6 @@ use iced::theme;
 use iced::widget::{button, column, container, pick_list, row, text, vertical_space};
 use iced::window;
 use iced::{Application, Command, Element, Length, Theme};
-
-#[cfg(windows)]
-use indoc::indoc;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -37,11 +33,9 @@ pub enum Message {
     SetColorMode(ColorMode),
     OpenFilePicker,
     SetImageFile(Option<String>),
+    SetFillMode(FillMode),
     Save,
     Cancel,
-
-    #[cfg(windows)]
-    SetFillMode(FillMode),
 }
 
 impl Application for Config {
@@ -86,18 +80,17 @@ impl Application for Config {
                 Command::none()
             }
 
+            Message::SetFillMode(new_fill_mode) => {
+                self.platform.windows.fill_mode = new_fill_mode;
+                Command::none()
+            }
+
             Message::Save => {
                 self.save().unwrap_or_else(|err| log::error!("{}", err));
                 window::close()
             }
 
             Message::Cancel => window::close(),
-
-            #[cfg(windows)]
-            Message::SetFillMode(new_fill_mode) => {
-                self.platform.windows.fill_mode = new_fill_mode;
-                Command::none()
-            }
         }
     }
 
@@ -148,8 +141,7 @@ impl Application for Config {
             .spacing(36)
             .padding(36);
 
-        #[cfg(windows)]
-        {
+        if cfg!(windows) {
             let fill_list = pick_list(
                 &FillMode::ALL[..],
                 Some(self.platform.windows.fill_mode),
@@ -161,21 +153,23 @@ impl Application for Config {
                 text("Fill mode").size(20.0),
                 "Configure how Flux works across multiple monitors.",
                 indoc! {"
-                None: Each monitor is a separate surface.
-                Span: Combines any matching adjacent monitors.
-                Fill: Combines all monitors into a single seamless surface.
-            "},
+                    None: Each monitor is a separate surface.
+                    Span: Combines any matching adjacent monitors.
+                    Fill: Combines all monitors into a single seamless surface.
+                "},
                 fill_list,
             ]
             .spacing(12);
 
-            content = content.push(fill_section)
+            content = content.push(fill_section);
         }
+
+        let version_text = text(format!("v{VERSION}")).size(12.0);
 
         content = content
             .push(button_row)
             .push(vertical_space(Length::Fill))
-            .push(text("v{VERSION}").size(12.0));
+            .push(version_text);
 
         container(content)
             .width(Length::Fill)
