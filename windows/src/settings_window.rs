@@ -9,12 +9,14 @@ use tinyfiledialogs::open_file_dialog;
 use iced::alignment::{Alignment, Horizontal};
 use iced::executor;
 use iced::theme;
-use iced::widget::{button, column, container, pick_list, row, text};
+use iced::widget::{button, column, container, pick_list, row, text, vertical_space};
 use iced::window;
 use iced::{Application, Command, Element, Length, Theme};
 
 #[cfg(windows)]
 use indoc::indoc;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn run(config: Config) -> iced::Result {
     Config::run(iced::Settings {
@@ -170,7 +172,10 @@ impl Application for Config {
             content = content.push(fill_section)
         }
 
-        content = content.push(button_row);
+        content = content
+            .push(button_row)
+            .push(vertical_space(Length::Fill))
+            .push(text("v{VERSION}").size(12.0));
 
         container(content)
             .width(Length::Fill)
