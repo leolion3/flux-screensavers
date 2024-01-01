@@ -118,9 +118,16 @@ impl Application for Config {
                 )
                 .align_items(Alignment::Center)
                 .spacing(12);
+
             if let Some(path) = &image_path {
-                image_picker = image_picker.push(text(path.display()));
+                let filename = path
+                    .file_name()
+                    .and_then(|p| p.to_str())
+                    .unwrap_or("Failed to read filename");
+
+                image_picker = image_picker.push(text(filename));
             }
+
             color_section = color_section.push(image_picker);
         }
 
@@ -170,7 +177,7 @@ impl Application for Config {
             .push(vertical_space(Length::Fill))
             .push(version_text);
 
-        container(content).into()
+        container(content.width(Length::Fill).height(Length::Fill)).into()
     }
 
     fn theme(&self) -> Theme {
