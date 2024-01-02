@@ -26,7 +26,7 @@ strip = true # Remove debug symbols
 [dependencies]
 async-std = "1"
 directories = "5"
-glow = "0.12"
+glow = "0.13"
 indoc = "2"
 log = { version = "0.4", features = ["serde"] }
 log-panics = { version = "2", features = ["with-backtrace"]}
