@@ -72,13 +72,32 @@
           sdl2Static = pkgs.callPackage sdl2StaticDrv {};
 
           x11BuildInputs = [
-              pkgs.xorg.libX11
-              pkgs.xorg.libXext
-              pkgs.xorg.libXrandr
-              pkgs.xorg.libXi
-              pkgs.xorg.libXScrnSaver
-              pkgs.xorg.libXcursor
-            ];
+            pkgs.xorg.libX11
+            pkgs.xorg.libXext
+            pkgs.xorg.libXrandr
+            pkgs.xorg.libXi
+            pkgs.xorg.libXScrnSaver
+            pkgs.xorg.libXcursor
+          ];
+
+          darwinBuildInputs = with pkgs.darwin.apple_sdk.frameworks; [
+            AppKit
+            ApplicationServices
+            AudioToolbox
+            Cocoa
+            CoreAudio
+            CoreFoundation
+            CoreGraphics
+            CoreHaptics
+            CoreText
+            CoreVideo
+            ForceFeedback
+            Foundation
+            GameController
+            Metal
+            OpenGL
+            QuartzCore
+          ];
         in rec {
           devShells.default = pkgs.mkShell {
             packages = with pkgs; [
@@ -90,25 +109,7 @@
               cmake
               alejandra
             ] ++ lib.optionals stdenv.isLinux x11BuildInputs
-              ++ lib.optionals stdenv.isDarwin
-              (with pkgs.darwin.apple_sdk.frameworks; [
-                AppKit
-                ApplicationServices
-                AudioToolbox
-                Cocoa
-                CoreAudio
-                CoreFoundation
-                CoreGraphics
-                CoreHaptics
-                CoreText
-                CoreVideo
-                ForceFeedback
-                Foundation
-                GameController
-                Metal
-                OpenGL
-                QuartzCore
-              ]);
+              ++ lib.optionals stdenv.isDarwin darwinBuildInputs;
           };
 
           packages.default = packages.flux-wrapped;
@@ -122,7 +123,8 @@
               fontconfig
               cmake
               sdl2Static
-            ] ++ lib.optionals stdenv.isLinux x11BuildInputs;
+            ] ++ lib.optionals stdenv.isLinux x11BuildInputs
+              ++ lib.optionals stdenv.isDarwin darwinBuildInputs;
           };
 
           packages.flux-wrapped = let 
