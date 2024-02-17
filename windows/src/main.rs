@@ -424,6 +424,7 @@ fn new_instance(
         .borderless()
         .hidden()
         .allow_highdpi()
+        .metal_view()
         .build()
         .map_err(|err| err.to_string())?;
 
