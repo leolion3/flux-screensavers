@@ -227,8 +227,8 @@ fn run_flux(mode: Mode, config: Config) -> Result<(), String> {
                 })
                 .collect::<Result<HashMap<WindowId, Instance>, String>>()?;
 
-            // Hide the cursor and report relative mouse movements.
-            sdl_context.mouse().set_relative_mouse_mode(true);
+            // Hide the cursor
+            sdl_context.mouse().show_cursor(false);
 
             // Unhide windows after context setup
             for instance in instances.values_mut() {
