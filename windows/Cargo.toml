@@ -17,10 +17,7 @@ FileDescription = "An open-source tribute to the macOS Drift screensaver"
 LegalCopyright = "© 2024 Sander Melnikov"
 
 [profile.release]
-codegen-units = 1 # Allow further optimisations by disabling parallel compilation
 lto = true # Enable link-time optimisation
-opt-level = 3
-panic = "abort" # Strip expensive panic unwinding code
 strip = true # Remove debug symbols
 
 [dependencies]
@@ -29,7 +26,7 @@ directories = "5"
 glow = "0.13"
 indoc = "2"
 log = { version = "0.4", features = ["serde"] }
-log-panics = { version = "2", features = ["with-backtrace"]}
+log-panics = { version = "2", features = ["with-backtrace"] }
 ordered-float = "4.2.0"
 raw-window-handle = "0.5"
 semver = { version = "1", features = ["serde"] }
